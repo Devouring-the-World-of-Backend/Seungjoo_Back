@@ -1,9 +1,10 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.exceptions import HTTPException
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
 from pydantic import BaseModel, validator
 from datetime import datetime
+from typing import Dict, Optional
 
 app = FastAPI()
 
@@ -11,7 +12,7 @@ class Book(BaseModel):
     id: int
     title: str
     author: str
-    description: str
+    description: Optional[str]
     published_year: int
 
     @validator('published_year')
@@ -21,7 +22,7 @@ class Book(BaseModel):
             raise ValueError('Invalid published year')
         return year
 
-DB = {}
+DB : Dict[int, Book] = {}
 
 @app.get("/")
 def read_root():
@@ -64,11 +65,11 @@ def delete_book(book_id: int):
     del DB[book_id]
     return f"Book {book_id} has been deleted."
 
-'''
+
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request, exc):
-    return PlainTextResponse(str(exc.detail), status_code=exc.status_code)
-'''
+    return JSONResponse(status_code=exc.status_code, content={"message":exc.detail})
+
 
 client = TestClient(app)
 
@@ -94,7 +95,7 @@ def test_create_book_fail():
     }
     response = client.post("/books", json=duplicated_book)
     assert response.status_code == 400
-    assert response.json() == {"detail": "Book already exists"}
+    assert response.json() == {"message": "Book already exists"}
 
 def test_read_book_list():
     response = client.get("/books")
@@ -107,7 +108,7 @@ def test_read_book():
 def test_read_book_fail():
     response = client.get("/books/10")
     assert response.status_code == 404
-    assert response.json() == {"detail": "Book not found"}
+    assert response.json() == {"message": "Book not found"}
 
 def test_update_book():
     update_book = {
@@ -130,7 +131,7 @@ def test_update_book_fail():
     }
     response = client.put("/books/100", json=nonexistent_book)
     assert response.status_code == 404
-    assert response.json() == {"detail": "Book not found"}
+    assert response.json() == {"message": "Book not found"}
 
 def test_delete_book():
     response = client.delete("/books/0")
@@ -139,4 +140,4 @@ def test_delete_book():
 def test_delete_book_fail():
     response = client.delete("/books/100")
     assert response.status_code == 404
-    assert response.json() == {"detail": "Book not found"}
+    assert response.json() == {"message": "Book not found"}
