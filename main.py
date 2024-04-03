@@ -4,15 +4,31 @@ from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
 from pydantic import BaseModel, validator
 from datetime import datetime
-from typing import Dict, Optional
+from typing import List, Dict, Optional
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+
+origins = [
+    "https://example-frontend.com",
+    "http://localhost:3000",
+    "http://localhost:8080",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins = origins,
+    allow_credentials = True,
+    allow_methods = ["GET", "POST", "PUT", "DELETE"],
+    allow_headers = ["*"],
+)
+
 
 class Book(BaseModel):
     id: int
     title: str
     author: str
-    description: Optional[str]
+    description: Optional[str] = None
     published_year: int
 
     @validator('published_year')
@@ -37,10 +53,17 @@ def add_book(book: Book):
     return book
 
 
-@app.get("/books")
-def read_book_list():
-    book_list = list(DB.values())
-    return book_list
+@app.get("/books", response_model=List[Book])
+def read_books(title: Optional[str] = None, author: Optional[str] = None, 
+               published_year: Optional[int] = None):
+    results = list(DB.values())
+    if title:
+        results = [book for book in results if title.lower() in book.title.lower()]
+    if author:
+        results = [book for book in results if author.lower() in book.author.lower()]
+    if published_year:
+        results = [book for book in results if published_year == book.published_year]
+    return results
 
 
 @app.get("/books/{book_id}", response_model=Book)
